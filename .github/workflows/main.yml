@@ -8,8 +8,10 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Build Windows .geode
         id: build
@@ -17,6 +19,7 @@ jobs:
         with:
           target: Win64
           sdk: latest
+          path: DecoPilot_v0.1_source/DecoPilot
 
       - name: Upload .geode
         uses: actions/upload-artifact@v4
