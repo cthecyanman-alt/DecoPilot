@@ -103,21 +103,16 @@ GameObject* addDeco(
 
     obj->setOpacity(opacity);
 
-    // Do NOT call updateMainColor() here.
-    // Newly-created objects may not have fully initialized
-    // color state yet, which can crash inside colorForMode.
-    //
-    // Instead, assign the color channel and tell GD that
-    // the object's color sprite / parent colors need updating.
+    // Assign GD color channels without forcing updateMainColor().
+    // Calling updateMainColor() immediately after creating certain
+    // objects caused the Geometry Dash colorForMode crash.
     if (obj->m_baseColor && colorID > 0) {
         obj->m_baseColor->m_colorID = colorID;
-        obj->m_shouldUpdateColorSprite = true;
         obj->m_updateParents = true;
     }
 
     if (obj->m_detailColor && colorID > 0) {
         obj->m_detailColor->m_colorID = colorID;
-        obj->m_shouldUpdateColorSprite = true;
         obj->m_updateParents = true;
     }
 
@@ -147,8 +142,7 @@ Result<GenerationStats> DecoEngine::generate(
         return Err("Editor is not available.");
     }
 
-    // Snapshot original solid anchors BEFORE creating anything.
-    // These objects are treated as the gameplay skeleton.
+    // Snapshot the original gameplay blocks before creating decoration.
     std::vector<GameObject*> anchors;
 
     anchors.reserve(
@@ -175,7 +169,6 @@ Result<GenerationStats> DecoEngine::generate(
         );
     }
 
-    // Safety cap to prevent runaway generations.
     constexpr size_t kMaxAnchors = 9000;
 
     if (anchors.size() > kMaxAnchors) {
@@ -273,6 +266,10 @@ Result<GenerationStats> DecoEngine::generate(
     size_t index = 0;
 
     for (auto* anchor : anchors) {
+        if (!anchor) {
+            continue;
+        }
+
         auto p = anchor->getPosition();
 
         auto key = gridKey(p);
@@ -291,12 +288,9 @@ Result<GenerationStats> DecoEngine::generate(
                 ? secondary
                 : primary;
 
-        // -------------------------------------------------
-        // 1) INNER PANEL
-        //
-        // Visually covers the plain block while leaving
-        // the original gameplay collision underneath.
-        // -------------------------------------------------
+        // -----------------------------------------
+        // 1. INNER BLOCK PANEL
+        // -----------------------------------------
         if ((index % panelEvery) == 0) {
             int panelID =
                 alternate
@@ -329,12 +323,9 @@ Result<GenerationStats> DecoEngine::generate(
             }
         }
 
-        // -------------------------------------------------
-        // 2) EXPOSED EDGE BLOCK DESIGN
-        //
-        // Only put edge deco where another gameplay block
-        // is not directly adjacent.
-        // -------------------------------------------------
+        // -----------------------------------------
+        // 2. EXPOSED EDGES
+        // -----------------------------------------
         auto exposed =
             [&](int dx, int dy) {
                 return !occupied.contains(
@@ -376,7 +367,7 @@ Result<GenerationStats> DecoEngine::generate(
                 0,
                 270.f,
                 {-15.f, 0.f}
-            },
+            }
         };
 
         for (auto const& edge : edges) {
@@ -412,7 +403,7 @@ Result<GenerationStats> DecoEngine::generate(
                 ++stats.placed;
             }
 
-            // Soft glow on some exposed edges.
+            // Controlled glow behind exposed edges.
             if (
                 plan.glowStrength > 0.12f &&
                 (
@@ -421,10 +412,8 @@ Result<GenerationStats> DecoEngine::generate(
                         edge.dx +
                         edge.dy +
                         16
-                    ) %
-                    2
-                ) ==
-                    0
+                    ) % 2
+                ) == 0
             ) {
                 if (
                     addDeco(
@@ -451,11 +440,9 @@ Result<GenerationStats> DecoEngine::generate(
             }
         }
 
-        // -------------------------------------------------
-        // 3) BACKGROUND MOTIFS
-        //
-        // Decorative objects behind gameplay.
-        // -------------------------------------------------
+        // -----------------------------------------
+        // 3. BACKGROUND DECORATION
+        // -----------------------------------------
         if ((index % bgEvery) == 0) {
             float offsetY =
                 75.f +
@@ -494,11 +481,9 @@ Result<GenerationStats> DecoEngine::generate(
             }
         }
 
-        // -------------------------------------------------
-        // 4) AIR DECORATION
-        //
-        // Intentionally sparse so gameplay remains clear.
-        // -------------------------------------------------
+        // -----------------------------------------
+        // 4. AIR DECORATION
+        // -----------------------------------------
         if ((index % airEvery) == 0) {
             int airID =
                 alternate
@@ -565,8 +550,8 @@ Result<GenerationStats> DecoEngine::generate(
         );
     }
 
-    // Store this generation as one reversible version.
-    // Original gameplay objects were never modified.
+    // Save DecoPilot's newly-created objects so Undo AI
+    // only removes objects created by DecoPilot.
     History::get().push(created);
 
     created->release();
