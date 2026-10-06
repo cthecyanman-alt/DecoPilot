@@ -1,0 +1,14 @@
+{
+  "geode": "5.10.1",
+  "gd": {
+    "win": "2.2081"
+  },
+  "id": "decopilot.local",
+  "name": "DecoPilot",
+  "version": "0.1.0",
+  "developer": "DecoPilot Prototype",
+  "description": "Decoration-only local AI copilot for the Geometry Dash editor. Original gameplay objects are never moved or deleted.",
+  "dependencies": {
+    "geode.node-ids": ">=v1.23.3"
+  }
+}
